@@ -1,0 +1,6 @@
+faster-whisper
+edge-tts
+imageio-ffmpeg
+pillow
+numpy
+pyJianYingDraft
