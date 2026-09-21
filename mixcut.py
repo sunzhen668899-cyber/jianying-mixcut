@@ -80,6 +80,21 @@ def load_cfg(work):
     return cfg
 
 
+BGM_LIB = Path(__file__).resolve().parent / "assets" / "bgm_library"
+
+
+def resolve_bgm(work, plan):
+    """BGM 优先级: plan.bgm_file > work/assets/bgm.wav(含 config.bgm_file 转换产物)。
+    plan.bgm_file 只写文件名时, 从 skill 内置曲库 BGM_LIB 里找。"""
+    f = (plan or {}).get("bgm_file") or ""
+    if f:
+        p = Path(f)
+        if not p.is_absolute():
+            p = BGM_LIB / f if (BGM_LIB / f).exists() else work / f
+        return p
+    return work / "work" / "assets" / "bgm.wav"
+
+
 # ---------------------------------------------------------------- probe
 def cmd_probe(work, args):
     src_dir = work / "sources"
@@ -318,6 +333,7 @@ def wrap_text(text):
 
 def cmd_render(work, args):
     cfg = load_cfg(work)
+    plan = json.loads((work / "plan.json").read_text(encoding="utf-8"))
     tl = json.loads((work / "work" / "timeline.json").read_text(encoding="utf-8"))
     segs = tl["segments"]
     body_dur = tl["total_dur"]
@@ -326,6 +342,8 @@ def cmd_render(work, args):
     assets = work / "work" / "assets"
     subs = work / "work" / "subs"
     subs.mkdir(exist_ok=True)
+    bgm_src = resolve_bgm(work, plan)
+    bgm_start = float(plan.get("bgm_start", 0))
 
     inputs = []
     for s in segs:
@@ -333,7 +351,7 @@ def cmd_render(work, args):
     for s in segs:
         inputs += ["-i", s["tts_path"]]
     inputs += ["-i", str(assets / "veil.png"), "-i", str(assets / "watermark.png"),
-               "-i", str(assets / "bgm.wav"),
+               "-i", str(bgm_src),
                "-loop", "1", "-t", str(end_dur), "-i", str(assets / "endcard.png")]
     n = len(segs)
     veil_i, wm_i, bgm_i, end_i = 2 * n, 2 * n + 1, 2 * n + 2, 2 * n + 3
@@ -388,7 +406,8 @@ def cmd_render(work, args):
     for j, s in enumerate(segs):
         fc.append(f"[{n + j}:a]aresample=44100,apad,atrim=0:{s['target_dur']}[a{j}]")
     fc.append("".join(f"[a{j}]" for j in range(n)) + f"concat=n={n}:v=0:a=1,apad,atrim=0:{total}[voice]")
-    fc.append(f"[{bgm_i}:a]aresample=44100,aloop=loop=-1:size=44100*60,atrim=0:{total},volume=0.28[bgm]")
+    fc.append(f"[{bgm_i}:a]aresample=44100,atrim=start={bgm_start},asetpts=PTS-STARTPTS,"
+              f"aloop=loop=-1:size=44100*60,atrim=0:{total},loudnorm=I=-24:TP=-4:LRA=11[bgm]")
     # amix 默认 normalize=1 会把人声和 BGM 都减半, 关掉后用 alimiter 防削波
     fc.append("[voice][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.9[aout]")
 
@@ -411,11 +430,14 @@ def cmd_draft(work, args):
         return int(round(sec * 1_000_000))
 
     cfg = load_cfg(work)
+    plan = json.loads((work / "plan.json").read_text(encoding="utf-8"))
     tl = json.loads((work / "work" / "timeline.json").read_text(encoding="utf-8"))
     segs = tl["segments"]
     assets = work / "work" / "assets"
     name = cfg["draft_name"] or f"{cfg['product_model']}混剪"
     end_dur, cover_dur = cfg["end_dur"], cfg["cover_dur"]
+    bgm_src = resolve_bgm(work, plan)
+    bgm_start = float(plan.get("bgm_start", 0))
 
     (work / "drafts").mkdir(parents=True, exist_ok=True)
     folder = draft.DraftFolder(str(work / "drafts"))
@@ -490,8 +512,9 @@ def cmd_draft(work, args):
             draft.AudioSegment(mat, trange(start, min(us(s["tts_dur"]), dur, mat.duration))),
             track=t_voice)
     script.add_segment(
-        draft.AudioSegment(str(assets / "bgm.wav"), trange(0, total_us),
-                           source_timerange=trange(0, total_us), volume=0.28),
+        draft.AudioSegment(str(bgm_src), trange(0, total_us),
+                           source_timerange=trange(us(bgm_start), us(bgm_start) + total_us),
+                           volume=0.5),
         track=t_bgm)
     script.save()
     out = work / "drafts" / name

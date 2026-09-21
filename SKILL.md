@@ -18,7 +18,7 @@
 
 1. 素材文件夹路径（放 2~N 个同产品视频，拷入 `<任务目录>/sources/`）
 2. 产品名 + 型号（封面用，如「九牧智能毛巾架 9340024-HC2」）
-3. 可选：水印名（默认「叁哥」）、音色（默认云希 `zh-CN-YunxiNeural`）、时长上限（默认 45s）、BGM 音乐文件（默认合成垫音，建议用户自备或在剪映换乐库）
+3. 可选：水印名（默认「叁哥」）、音色（默认云希 `zh-CN-YunxiNeural`）、时长上限（默认 45s）、BGM（默认从 skill 内置曲库 `assets/bgm_library/` 选，每个版本配不同曲子；用户也可在音乐文件路径上自备）
 
 ## 工作流（严格按序）
 
@@ -47,8 +47,11 @@ prep 完必须抽一张 src_clean 的帧确认字幕区已裁除干净（prep �
 ```json
 {"canvas": [1080, 1920],
  "sources": {"v1": "work/src_clean/1.mp4", "v2": "work/src_clean/2.mp4"},
+ "bgm_file": "Monkeys Spinning Monkeys.mp3",
+ "bgm_start": 0,
  "segments": [{"order": 1, "video": "v1", "start": 12.3, "end": 18.5, "text": "改写后的口播文案"}]}
 ```
+`bgm_file` 只写文件名时从 skill 内置曲库 `assets/bgm_library/` 取（也可写绝对路径用用户自备音乐）；`bgm_start` 是曲子起始偏移秒数。不写则用 `work/assets/bgm.wav`（合成垫音，仅兜底——合成垫音听感像电流声，正式出片不要用）。
 **检查点**：把分段清单（每段来源+时间区间+文案）和预估总时长发给用户确认后再继续。
 
 ### 4. tts + timeline — 配音与时间线
@@ -76,8 +79,8 @@ PY mixcut.py draft --work <任务目录> --install
 ### 7. 三版本备选（默认流程，每次成品必做）
 
 同一批素材、同一次收集，固定产出 **3 个不同版本**，供用户当天一个账号分时段发布（早中晚）。做法：
-- 在第 3 步精剪决策时直接写 3 份 plan（不同切入角度，如：奶油风角度 / 双色功能角度 / 快节奏清单），分段组合、顺序、文案都要错开，避免平台判重
-- 每版独立走 tts → timeline → render → qc → draft，每版前把 `config.json` 的 `draft_name` 改成 `<型号>A/B/C`
+- 在第 3 步精剪决策时直接写 3 份 plan（不同切入角度，如：奶油风角度 / 双色功能角度 / 快节奏清单），分段组合、顺序、文案都要错开，避免平台判重；**每版 `bgm_file` 配不同的曲子**（曲库不同曲目或不同 `bgm_start` 偏移）
+- 每版独立走 tts → timeline → render → qc → draft，每版前把 `config.json` 的 `draft_name` 改成 `<型号>A/B/C`。**换 plan 后必须重跑 tts + timeline**（timeline.json 和 work/tts/ 是按 plan 生成的，只重跑 render 会产出上一版的内容）
 - 产物归档：每版渲染完立刻 `cp work/final.mp4 work/final_<版本>.mp4` 并把 `work/qc/` 改名 `work/qc_<版本>/`，防止被下一版覆盖；plan 备份为 `plan_<版本>.json`
 - 三版全部 QC 通过、草稿装好后再一次性汇总交付
 - 素材尾段越界坑：draft 对 `end` 越界敏感（哪怕超 3ms 也报错），plan 里每段 `end` 要比源片实际时长至少短 0.03s

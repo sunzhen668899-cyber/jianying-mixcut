@@ -77,4 +77,4 @@ collector.py --lib <素材库> qc [--model <型号>]                      # 时�
 ## 说明
 
 - 平台查重无 100% 保证，建议首发观察流量再批量
-- 默认 BGM 为合成垫音，建议在剪映乐库换热门免费曲（草稿里 BGM 独立一轨）
+- BGM 走内置免版税曲库（assets/bgm_library，Kevin MacLeod CC-BY），plan.json 里用 bgm_file/bgm_start 按版本配不同曲子，发布文案带一句 "Music: Kevin MacLeod" 即合规；不配则回落合成垫音兜底
