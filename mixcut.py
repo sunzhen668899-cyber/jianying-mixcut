@@ -150,15 +150,16 @@ def cmd_assets(work, args):
     else:
         sr, dur = 44100, 150.0
         t = np.arange(int(sr * dur)) / sr
-        pad = (np.sin(2 * np.pi * 130.81 * t) * 0.35
-               + np.sin(2 * np.pi * 196.00 * t) * 0.28
-               + np.sin(2 * np.pi * 329.63 * t) * 0.18)
+        pad = (np.sin(2 * np.pi * 65.41 * t) * 0.30
+               + np.sin(2 * np.pi * 98.00 * t) * 0.26
+               + np.sin(2 * np.pi * 130.81 * t) * 0.22
+               + np.sin(2 * np.pi * 164.81 * t) * 0.14)
         lfo = 0.75 + 0.25 * np.sin(2 * np.pi * 0.08 * t)
-        notes = [523.25, 587.33, 659.25, 783.99, 880.00]
+        notes = [261.63, 293.66, 329.63, 392.00, 440.00]
         arp = np.zeros_like(t)
         for i, start in enumerate(np.arange(0, dur, 0.5)):
             idx = (t >= start) & (t < start + 0.5)
-            arp[idx] += np.sin(2 * np.pi * notes[i % 5] * (t[idx] - start)) * np.exp(-4 * (t[idx] - start)) * 0.15
+            arp[idx] += np.sin(2 * np.pi * notes[i % 5] * (t[idx] - start)) * np.exp(-6 * (t[idx] - start)) * 0.08
         music = pad * lfo + arp
         fade = int(sr * 2)
         music[:fade] *= np.linspace(0, 1, fade)
@@ -188,13 +189,14 @@ def cmd_prep(work, args):
             print(f"{name}: 无需模糊, 已复制")
             continue
         _, w, h = probe_media(src)
-        y = int(h * band[0]) // 2 * 2
-        bh = int(h * band[1]) // 2 * 2 - y
-        fc = (f"[0:v]split[m][s];[s]crop={w}:{bh}:0:{y},boxblur=20:4[bb];[m][bb]overlay=0:{y}")
+        # 烧录字幕是像素级的, 模糊遮盖会像一层膜; 直接裁掉字幕区以下画面,
+        # render 端会等比放大铺满画布(损失左右少量边缘, 主体居中不受影响)
+        ch = int(h * band[0]) // 2 * 2
+        fc = f"[0:v]crop={w}:{ch}:0:0"
         run([FFMPEG, "-y", "-i", str(src), "-filter_complex", fc,
              "-c:v", "libx264", "-preset", "fast", "-crf", "18",
              "-c:a", "copy", "-pix_fmt", "yuv420p", str(dst)], f"预处理失败: {name}")
-        print(f"{name}: 字幕带 {band} 已模糊 -> {dst}")
+        print(f"{name}: 字幕区 {band} 以下已裁除 -> {dst}")
 
 
 # ---------------------------------------------------------------- transcribe
@@ -260,7 +262,9 @@ def cmd_tts(work, args):
         for seg in plan["segments"]:
             order = seg["order"]
             path = tts_dir / f"seg{order:02d}.mp3"
-            await edge_tts.Communicate(seg["text"], cfg["voice"], rate=cfg["tts_rate"]).save(str(path))
+            # 连续数字串按位分开读(36656 -> "3 6 6 5 6"逐位念), 仅影响配音, 字幕仍显示原文
+            spoken = re.sub(r"\d{3,}", lambda m: " ".join(m.group()), seg["text"])
+            await edge_tts.Communicate(spoken, cfg["voice"], rate=cfg["tts_rate"]).save(str(path))
             dur, _, _ = probe_media(path)
             durations[str(order)] = {"path": str(path), "dur": round(dur, 3)}
             print(f"seg{order:02d}: {dur:.2f}s  {seg['text'][:18]}")
@@ -340,7 +344,7 @@ def cmd_render(work, args):
             f"[{i}:v]trim=start={s['src_start']}:end={s['src_start'] + s['src_dur']},"
             f"setpts=(PTS-STARTPTS)/{s['speed']},fps=30,format=yuv420p,setsar=1,split[bg{i}][fg{i}]")
         fc.append(f"[bg{i}]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,boxblur=15:2[bgi{i}]")
-        fc.append(f"[fg{i}]scale=1080:1920:force_original_aspect_ratio=decrease,setsar=1[fgi{i}]")
+        fc.append(f"[fg{i}]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[fgi{i}]")
         fc.append(f"[bgi{i}][fgi{i}]overlay=(W-w)/2:(H-h)/2[v{i}]")
     fc.append("".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[cat]")
     fc.append("[cat]scale=1112:1978,crop=1080:1920,setsar=1[base]")   # 1.03 放大裁边(去重)
@@ -384,8 +388,9 @@ def cmd_render(work, args):
     for j, s in enumerate(segs):
         fc.append(f"[{n + j}:a]aresample=44100,apad,atrim=0:{s['target_dur']}[a{j}]")
     fc.append("".join(f"[a{j}]" for j in range(n)) + f"concat=n={n}:v=0:a=1,apad,atrim=0:{total}[voice]")
-    fc.append(f"[{bgm_i}:a]aresample=44100,aloop=loop=-1:size=44100*60,atrim=0:{total},volume=0.16[bgm]")
-    fc.append("[voice][bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]")
+    fc.append(f"[{bgm_i}:a]aresample=44100,aloop=loop=-1:size=44100*60,atrim=0:{total},volume=0.28[bgm]")
+    # amix 默认 normalize=1 会把人声和 BGM 都减半, 关掉后用 alimiter 防削波
+    fc.append("[voice][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.9[aout]")
 
     fc_path = work / "work" / "filter_complex.txt"
     fc_path.write_text(";\n".join(fc), encoding="utf-8")
@@ -486,7 +491,7 @@ def cmd_draft(work, args):
             track=t_voice)
     script.add_segment(
         draft.AudioSegment(str(assets / "bgm.wav"), trange(0, total_us),
-                           source_timerange=trange(0, total_us), volume=0.16),
+                           source_timerange=trange(0, total_us), volume=0.28),
         track=t_bgm)
     script.save()
     out = work / "drafts" / name

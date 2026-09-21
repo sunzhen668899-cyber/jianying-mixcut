@@ -28,7 +28,7 @@
 ```
 PY mixcut.py probe --work <任务目录>
 ```
-读 `work/probe/` 里每个源片的 3 张抽帧，**肉眼定位烧录字幕的纵向区间**，写回 `config.json` 的 `sources.<文件>.band`（如 `[0.66, 0.84]`；源片无烧录字幕则 `null`）。同时把产品名/型号等填入 config。
+读 `work/probe/` 里每个源片的 3 张抽帧，**肉眼定位烧录字幕的上边界**，写回 `config.json` 的 `sources.<文件>.band`（如 `[0.78, 0.93]`；源片无烧录字幕则 `null`）。band[0] 是裁剪线：要比字幕最上沿再高 1~2%，否则字幕上沿会残留在画面里。同时把产品名/型号等填入 config。
 
 ### 2. assets + prep + transcribe — 预处理（可连续跑）
 ```
@@ -36,7 +36,7 @@ PY mixcut.py assets --work <任务目录>
 PY mixcut.py prep --work <任务目录>
 PY mixcut.py transcribe --work <任务目录>
 ```
-prep 完必须抽一张 src_clean 的帧确认字幕带被模糊覆盖；没盖住就调 band 重跑。
+prep 完必须抽一张 src_clean 的帧确认字幕区已裁除干净（prep 是直接裁掉 band[0] 以下画面再放大铺满，不用模糊——模糊会像一层透明膜，用户明确不要）；有残留就调 band[0] 重跑。
 
 ### 3. 精剪决策（Kimi 做，不可跳过）
 读 `work/transcripts/*.json` 全部逐字稿，做语义级去重：
@@ -57,6 +57,8 @@ PY mixcut.py tts --work <任务目录>
 PY mixcut.py timeline --work <任务目录>
 ```
 正片总时长 > max_dur 时：回第 3 步砍段或截短文案，重跑这两步（不要靠提速硬压）。
+
+注意：tts 会自动把文案里 ≥3 位的连续数字串按位分开再配音（`36656` 读作「三 六 六 五 六」，否则 TTS 会读成「三万六千六十五」），**plan 文案里型号保持连写**，字幕显示不受影响。
 
 ### 5. render + qc — 成片与质检
 ```
