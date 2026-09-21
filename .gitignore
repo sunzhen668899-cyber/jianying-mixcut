@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+browser_profile/
+auth.json
+素材库/
+jobs/

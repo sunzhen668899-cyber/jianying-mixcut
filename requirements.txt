@@ -4,3 +4,5 @@ imageio-ffmpeg
 pillow
 numpy
 pyJianYingDraft
+playwright
+opencv-python-headless

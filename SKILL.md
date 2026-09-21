@@ -71,6 +71,36 @@ PY mixcut.py draft --work <任务目录> --install
 ```
 自动拷入剪映草稿目录，提示用户**重启剪映**打开。草稿里字幕/水印/幕布/BGM 都是独立轨道可改。
 
+## 素材收集（collector.py，混剪的可选前置）
+
+从抖音收集同产品好物分享素材，产出带质检标注的素材库，供混剪流水线挑选。素材表：`<素材库>/素材表.csv`（utf-8-sig，Excel 可直接打开），状态机：`候选 → 待下载 → 已下载 → 待审核 → 可用/弃用 → 已用`。收集门槛默认点赞≥30（`--min-likes` 可调）；只收无人脸、无作者名/抖音号烧录水印的好物分享类，无作者信息的固定角标放行。**调用一律 `PY collector.py --lib <素材库目录> <子命令>`（--lib 必传）**。
+
+### author — 按账号批量收（免登录）
+```
+PY collector.py --lib <素材库> author --url <作者主页链接> --model <型号> [--max 50 --min-likes 30]
+```
+抓作者全部作品卡片（点赞取 `span.author-card-user-video-like`，排除推荐区噪声），达标的写素材表为「候选」。人工/AI 把要下载的行状态改为「待下载」。注意：按账号收是全店混合产品，qc 审核时按目标型号筛掉非目标产品（标弃用）。
+
+### login + search — 按关键词搜（需登录）
+```
+PY collector.py --lib <素材库> login     # 扫码，cookies 存 browser_profile/
+PY collector.py --lib <素材库> search --keyword <词> --model <型号>
+```
+抖音网页版视频页/作者页免登录，但搜索页强制登录；扫码一次后 profile 长效。
+
+### download — 下载「待下载」行
+浏览器打开视频页取 web 播放流（v26-web.douyinvod.com，即无水印源），curl 带 UA + `Referer: https://www.douyin.com/` 下载；<300KB 判定为风控占位流，删文件保持「待下载」，重试即可。
+
+### qc — 质检「已下载」行
+ffprobe 测时长/分辨率 + 抽 3 帧到 `<型号>/qc/<id>/` + YuNet 人脸初筛，状态置「待审核」。然后 AI/人工看抽帧回填：人脸、水印贴纸、字幕带（如 `[0.82,0.95]`）、状态（可用/弃用）。
+
+### 收集器已知坑（勿重复踩）
+
+- 全新 chromium 会被风控喂 2.6s/194KB 占位预览流；必须 `launch_persistent_context(browser_profile/)` 养 cookies，下载失败重试或先跑一次 login
+- cv2（5.x）在 Windows 读不了中文路径图片：用 `np.fromfile + imdecode`；cv2 5.0 移除了 `CascadeClassifier`，人脸检测用 YuNet（`assets/face_detection_yunet_2023mar.onnx`，已随仓库）
+- playwright 装完还要 `playwright install chromium`
+- 素材表字幕带字段值含逗号，手写 CSV 行必须带引号
+
 ## 交付话术要点
 
 - 给用户两个产物：`work/final.mp4`（直发）+ 剪映草稿（微调导出）
