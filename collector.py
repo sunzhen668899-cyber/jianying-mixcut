@@ -298,15 +298,17 @@ def cmd_qc(args):
         qc_dir.mkdir(parents=True, exist_ok=True)
         d, res = ffprobe(src)
         r["时长s"], r["分辨率"] = d, res
-        frames = max(int(d * 30) - 1, 30)
+        ts = [0.4, max(d / 2, 0.5), max(d - 1.0, 0.6)]   # 按时间戳取帧，不依赖帧率
+        sel = "+".join(f"between(t\\,{max(t - 0.2, 0):.2f}\\,{t + 0.2:.2f})" for t in ts)
         proc = subprocess.run([ff, "-y", "-i", str(src), "-vf",
-                               f"select=eq(n\\,10)+eq(n\\,{frames//2})+eq(n\\,{frames-10}),scale=540:-1",
+                               f"select='{sel}',scale=540:-1",
                                "-vsync", "vfr", "-frames:v", "3", str(qc_dir / "f%d.jpg")],
                               capture_output=True)
-        if not (qc_dir / "f1.jpg").exists():
+        jpgs = sorted(qc_dir.glob("f*.jpg"))
+        if len(jpgs) < 3:
             tail = proc.stderr.decode("utf-8", "ignore")[-300:]
-            print(f"[qc][warn] 抽帧失败 rc={proc.returncode} {src.name}: {tail}")
-        faces = [face_detect(qc_dir / f"f{i}.jpg") for i in (1, 2, 3)]
+            print(f"[qc][warn] 只抽到 {len(jpgs)}/3 帧 rc={proc.returncode} {src.name}: {tail}")
+        faces = [face_detect(f) for f in jpgs]
         r["人脸"] = ("疑似" if any(faces) else "无") if any(f is not None for f in faces) else ""
         r["状态"] = "待审核"
         print(f"[qc] {r['文件名']} {d}s {res} 人脸:{r['人脸']} -> {qc_dir}")
