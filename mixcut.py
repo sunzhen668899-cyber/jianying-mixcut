@@ -47,7 +47,7 @@ DEFAULTS = {
     "max_dur": 45.0, "cover_dur": 1.3, "end_dur": 1.5,
     "bgm_file": "",            # 空=合成垫音; 否则为用户音乐文件路径
     "draft_name": "",
-    "sources": {},             # "1.mp4": {"band": [0.75, 0.90] 或 null}
+    "sources": {},             # "1.mp4": {"band": [0.75, 0.90], "top": 0.18(可选,顶部花字上裁线)} 或 null
 }
 
 
@@ -206,12 +206,15 @@ def cmd_prep(work, args):
         _, w, h = probe_media(src)
         # 烧录字幕是像素级的, 模糊遮盖会像一层膜; 直接裁掉字幕区以下画面,
         # render 端会等比放大铺满画布(损失左右少量边缘, 主体居中不受影响)
-        ch = int(h * band[0]) // 2 * 2
-        fc = f"[0:v]crop={w}:{ch}:0:0"
+        # top(可选): 源片顶部有烧录花字时, 从 top 比例处开始保留(双裁)
+        top = sc.get("top") or 0
+        y0 = int(h * top) // 2 * 2
+        ch = int(h * (band[0] - top)) // 2 * 2
+        fc = f"[0:v]crop={w}:{ch}:0:{y0}"
         run([FFMPEG, "-y", "-i", str(src), "-filter_complex", fc,
              "-c:v", "libx264", "-preset", "fast", "-crf", "18",
              "-c:a", "copy", "-pix_fmt", "yuv420p", str(dst)], f"预处理失败: {name}")
-        print(f"{name}: 字幕区 {band} 以下已裁除 -> {dst}")
+        print(f"{name}: 字幕区 {band} 以下已裁除(上裁 top={top}) -> {dst}")
 
 
 # ---------------------------------------------------------------- transcribe
