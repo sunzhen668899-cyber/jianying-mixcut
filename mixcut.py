@@ -344,7 +344,7 @@ def cmd_render(work, args):
     subs.mkdir(exist_ok=True)
     bgm_src = resolve_bgm(work, plan)
     bgm_start = float(plan.get("bgm_start", 0))
-    bgm_vol = float(plan.get("bgm_volume", 1.0))
+    bgm_vol = float(plan.get("bgm_volume", 0.75))
 
     inputs = []
     for s in segs:
@@ -440,7 +440,7 @@ def cmd_draft(work, args):
     end_dur, cover_dur = cfg["end_dur"], cfg["cover_dur"]
     bgm_src = resolve_bgm(work, plan)
     bgm_start = float(plan.get("bgm_start", 0))
-    bgm_vol = float(plan.get("bgm_volume", 1.0))
+    bgm_vol = float(plan.get("bgm_volume", 0.75))
 
     (work / "drafts").mkdir(parents=True, exist_ok=True)
     folder = draft.DraftFolder(str(work / "drafts"))

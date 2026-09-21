@@ -52,7 +52,7 @@ prep 完必须抽一张 src_clean 的帧确认字幕区已裁除干净（prep �
  "bgm_volume": 0.75,
  "segments": [{"order": 1, "video": "v1", "start": 12.3, "end": 18.5, "text": "改写后的口播文案"}]}
 ```
-`bgm_file` 只写文件名时从 skill 内置曲库 `assets/bgm_library/` 取（也可写绝对路径用用户自备音乐）；`bgm_start` 是曲子起始偏移秒数；`bgm_volume` 是 BGM 相对音量（默认 1.0，实测 0.75 听感最平衡，想要「再小一点」就往下调）。不写则用 `work/assets/bgm.wav`（合成垫音，仅兜底——合成垫音听感像电流声，正式出片不要用）。
+`bgm_file` 只写文件名时从 skill 内置曲库 `assets/bgm_library/` 取（也可写绝对路径用用户自备音乐）；`bgm_start` 是曲子起始偏移秒数；`bgm_volume` 是 BGM 相对音量（默认 0.75，经用户验收的听感平衡点；想「再小一点」就往下调，想突出 BGM 就往 1.0 靠）。不写则用 `work/assets/bgm.wav`（合成垫音，仅兜底——合成垫音听感像电流声，正式出片不要用）。
 **检查点**：把分段清单（每段来源+时间区间+文案）和预估总时长发给用户确认后再继续。
 
 ### 4. tts + timeline — 配音与时间线
