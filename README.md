@@ -48,7 +48,7 @@ mixcut.py qc         --work <任务目录>   # 抽 5 帧质检
 mixcut.py draft      --work <任务目录> --install   # 生成剪映草稿并安装
 ```
 
-详见 [SKILL.md](SKILL.md)。
+默认按「三版本备选」出片：同一批素材写 3 份 plan（不同切入角度/分段组合/文案），每版独立走 tts → timeline → render → qc → draft，`draft_name` 用 `<型号>A/B/C` 区分，产物归档为 `work/final_A|B|C.mp4` 与 `work/qc_A|B|C/`。详见 [SKILL.md](SKILL.md) 第 7 节。
 
 ### 素材收集（可选前置）
 
