@@ -159,9 +159,20 @@ def cmd_login(args):
     with sync_playwright() as p:
         ctx, page = open_browser(p)
         page.goto("https://www.douyin.com/", wait_until="domcontentloaded")
-        input("请在浏览器里扫码登录抖音，登录成功后回到这里按回车...")
+        print("浏览器窗口已打开抖音，请用抖音 App 扫码登录（检测到登录态会自动关闭窗口）...")
+        deadline = time.time() + 300
+        ok = False
+        while time.time() < deadline:
+            if any(c["name"] == "sessionid" for c in ctx.cookies()):
+                ok = True
+                break
+            time.sleep(3)
+        time.sleep(2)  # 等 cookie 落盘
         ctx.close()
-    print(f"登录态已保存到浏览器 profile: {PROFILE_DIR}")
+    if ok:
+        print(f"登录成功，登录态已保存到浏览器 profile: {PROFILE_DIR}")
+    else:
+        raise SystemExit("5 分钟内未检测到登录态，请重跑 login")
 
 
 def cmd_search(args):
