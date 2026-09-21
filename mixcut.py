@@ -344,6 +344,7 @@ def cmd_render(work, args):
     subs.mkdir(exist_ok=True)
     bgm_src = resolve_bgm(work, plan)
     bgm_start = float(plan.get("bgm_start", 0))
+    bgm_vol = float(plan.get("bgm_volume", 1.0))
 
     inputs = []
     for s in segs:
@@ -407,7 +408,8 @@ def cmd_render(work, args):
         fc.append(f"[{n + j}:a]aresample=44100,apad,atrim=0:{s['target_dur']}[a{j}]")
     fc.append("".join(f"[a{j}]" for j in range(n)) + f"concat=n={n}:v=0:a=1,apad,atrim=0:{total}[voice]")
     fc.append(f"[{bgm_i}:a]aresample=44100,atrim=start={bgm_start},asetpts=PTS-STARTPTS,"
-              f"aloop=loop=-1:size=44100*60,atrim=0:{total},loudnorm=I=-24:TP=-4:LRA=11[bgm]")
+              f"aloop=loop=-1:size=44100*60,atrim=0:{total},loudnorm=I=-24:TP=-4:LRA=11,"
+              f"volume={bgm_vol}[bgm]")
     # amix 默认 normalize=1 会把人声和 BGM 都减半, 关掉后用 alimiter 防削波
     fc.append("[voice][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.9[aout]")
 
@@ -438,6 +440,7 @@ def cmd_draft(work, args):
     end_dur, cover_dur = cfg["end_dur"], cfg["cover_dur"]
     bgm_src = resolve_bgm(work, plan)
     bgm_start = float(plan.get("bgm_start", 0))
+    bgm_vol = float(plan.get("bgm_volume", 1.0))
 
     (work / "drafts").mkdir(parents=True, exist_ok=True)
     folder = draft.DraftFolder(str(work / "drafts"))
@@ -514,7 +517,7 @@ def cmd_draft(work, args):
     script.add_segment(
         draft.AudioSegment(str(bgm_src), trange(0, total_us),
                            source_timerange=trange(us(bgm_start), us(bgm_start) + total_us),
-                           volume=0.5),
+                           volume=round(0.5 * bgm_vol, 3)),
         track=t_bgm)
     script.save()
     out = work / "drafts" / name
