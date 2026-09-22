@@ -40,12 +40,17 @@ def load_rows(lib):
 
 def save_rows(lib, rows):
     lib.mkdir(parents=True, exist_ok=True)
-    with open(table_file(lib), "w", encoding="utf-8-sig", newline="") as fh:
+    import os
+    import tempfile
+    tf = table_file(lib)
+    fd, tmp = tempfile.mkstemp(dir=str(lib), suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
         w.writeheader()
         for r in rows:
             r.pop(None, None)
             w.writerow(r)
+    os.replace(tmp, tf)  # 原子替换，避免写一半崩溃截断素材表
 
 
 def video_id(url):

@@ -246,18 +246,26 @@ def cmd_transcribe(work, args):
         if v.suffix.lower() not in (".mp4", ".mov", ".mkv"):
             continue
         try:
-            segments, info = get_model().transcribe(
-                str(v), language="zh", vad_filter=True,
-                word_timestamps=True, initial_prompt=prompt)
-            segments = list(segments)  # 生成器: 此处才真正推理, CUDA 缺dll会在这抛
-        except RuntimeError as e:
-            if state["device"] == "cpu":
-                raise
-            print(f"CUDA 推理失败({e}), 退回 CPU int8 重试")
-            segments, info = get_model(force_cpu=True).transcribe(
-                str(v), language="zh", vad_filter=True,
-                word_timestamps=True, initial_prompt=prompt)
-            segments = list(segments)
+            try:
+                segments, info = get_model().transcribe(
+                    str(v), language="zh", vad_filter=True,
+                    word_timestamps=True, initial_prompt=prompt)
+                segments = list(segments)  # 生成器: 此处才真正推理, CUDA 缺dll会在这抛
+            except RuntimeError as e:
+                if state["device"] == "cpu":
+                    raise
+                print(f"CUDA 推理失败({e}), 退回 CPU int8 重试")
+                segments, info = get_model(force_cpu=True).transcribe(
+                    str(v), language="zh", vad_filter=True,
+                    word_timestamps=True, initial_prompt=prompt)
+                segments = list(segments)
+        except Exception as e:
+            # 单文件失败(如无音频流/解码失败)不中断整批, 写空结果便于 plan 阶段跳过
+            print(f"{v.name}: 转写失败({e}), 写入空 segments 跳过")
+            result = {"source": v.name, "duration": 0, "segments": []}
+            (out_dir / f"{v.stem}.json").write_text(
+                json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+            continue
         result = {"source": v.name, "duration": info.duration,
                   "segments": [{"start": round(s.start, 2), "end": round(s.end, 2),
                                 "text": s.text.strip()} for s in segments]}
