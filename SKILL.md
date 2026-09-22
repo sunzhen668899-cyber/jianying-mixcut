@@ -103,6 +103,15 @@ PY collector.py --lib <素材库> search --keyword <词> --model <型号>
 ```
 抖音网页版视频页/作者页免登录，但搜索页强制登录；扫码一次后 profile 长效。
 
+### 批量搜索限流（实测）
+
+连续批量 search 会触发**接口级限流**：返回"抓到 0 条"但页面本身无验证码、cookie 也未失效（手动单搜同型号立即可成功）。实测数据：无间隔连跑约 11 个型号后开始大量抓 0；间隔 35~55s 约 50% 成功率。应对策略：
+
+- 型号间随机间隔 ≥45~75s；单型号抓 0 时等 75~105s 自动重试，最多 3 次，大多能救回
+- 仍抓 0 的型号别死磕：标记后跳过，隔一段时间再补，或降 `--min-likes 10` 试一次（也可能是真没素材）
+- 输出"搜索页需要登录态"（SystemExit）才是真失效：停下脚本，弹窗让用户扫码（`login` 子命令或打开搜索页），不要继续空跑
+- 批量脚本 print 中文必须 GBK 安全（`print(s.encode('gbk', errors='replace').decode('gbk'))`），否则 Windows 控制台 UnicodeEncodeError 直接炸掉整轮
+
 ### download — 下载「待下载」行
 浏览器打开视频页取 web 播放流（v26-web.douyinvod.com，即无水印源），curl 带 UA + `Referer: https://www.douyin.com/` 下载；<300KB 判定为风控占位流，删文件保持「待下载」，重试即可。
 
