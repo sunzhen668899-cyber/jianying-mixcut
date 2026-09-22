@@ -194,11 +194,36 @@ def cmd_search(args):
 # ---------- 下载 ----------
 
 def get_play_url(page, link):
-    page.goto(link, wait_until="domcontentloaded")
-    time.sleep(3)
-    return page.evaluate(
-        "() => { const v = document.querySelector('video'); if (!v) return ''; "
-        "v.muted = true; v.play().catch(()=>{}); return v.src || v.currentSrc; }")
+    # 短视频 video.src 是直链 MP4；长视频走 MSE（blob:），
+    # 需从网络响应里嗅 douyinvod CDN 真实地址（去掉 Range 头即可下全量）
+    captured = []
+
+    def on_response(resp):
+        try:
+            u = resp.url
+            ct = resp.headers.get("content-type", "")
+        except Exception:
+            return
+        if "douyinvod" in u and ("video" in ct or ".mp4" in u) and u not in captured:
+            captured.append(u)
+
+    page.on("response", on_response)
+    try:
+        page.goto(link, wait_until="domcontentloaded")
+        time.sleep(3)
+        src = page.evaluate(
+            "() => { const v = document.querySelector('video'); if (!v) return ''; "
+            "v.muted = true; v.play().catch(()=>{}); return v.src || v.currentSrc; }")
+        if src and not src.startswith("blob:"):
+            return src
+        time.sleep(6)  # 让 MSE 缓冲几段，抓到 CDN 请求
+        if not captured:
+            page.evaluate(
+                "() => { const v = document.querySelector('video'); if (v) v.currentTime = 5; }")
+            time.sleep(4)
+        return captured[0] if captured else ""
+    finally:
+        page.remove_listener("response", on_response)
 
 
 def cmd_download(args):
